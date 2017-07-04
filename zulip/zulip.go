@@ -31,8 +31,16 @@ func New(endpoint string, username string, keyFile string) (*Client, error) {
 }
 
 type Message struct {
-	RawId   json.Number `json:"id"`
-	Content string
+	RawId          json.Number `json:"id"`
+	Type           string      `json:"type"`
+	RawRecipient   interface{} `json:"display_recipient"`
+	Subject        string      `json:"subject"`
+	Content        string      `json:"content"`
+	SenderEmail    string      `json:"sender_email"`
+	SenderFullName string      `json:"sender_full_name"`
+
+	Stream     string
+	Recipients []string
 }
 
 func (m Message) Id() string {
@@ -141,6 +149,21 @@ func (c Client) Events(queueId, lastEventId string) ([]Event, error) {
 			data = rawEv.Message
 			var v Message
 			err = json.Unmarshal(data, &v)
+			switch recipient := v.RawRecipient.(type) {
+			case string:
+				v.Stream = recipient
+			case []interface{}:
+				v.Recipients = make([]string, len(recipient))
+				for i, r := range recipient {
+					r, ok := r.(map[string]interface{})
+					if !ok {
+						return nil, fmt.Errorf("unknown recipient type: %T", r)
+					}
+					v.Recipients[i] = r["email"].(string)
+				}
+			default:
+				return nil, fmt.Errorf("unknown recipient type: %T", recipient)
+			}
 			ev = v
 		case "heartbeat":
 			data = rawEv.Heartbeat
