@@ -87,7 +87,6 @@ func (c Client) Register(eventTypes ...string) (*RegisterResponse, error) {
 		return nil, fmt.Errorf("register: %s: %s", register.Result, register.Msg)
 	}
 
-	fmt.Println(register)
 	return &register, nil
 }
 
@@ -156,7 +155,6 @@ func (c Client) Events(queueId, lastEventId string) ([]Event, error) {
 			return nil, fmt.Errorf("parsing event: %s: %s", string(data), err)
 		}
 
-		fmt.Printf("%#v\n", ev)
 		parsedEvents[i] = ev.(Event)
 	}
 
