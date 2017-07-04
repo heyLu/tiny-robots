@@ -47,6 +47,23 @@ func (m Message) Id() string {
 	return m.RawId.String()
 }
 
+func (m Message) Reply(content string) Message {
+	reply := Message{
+		Type:    m.Type,
+		Subject: m.Subject,
+		Content: content,
+	}
+	switch m.Type {
+	case "private":
+		reply.Recipients = m.Recipients
+	case "stream":
+		reply.Stream = m.Stream
+	default:
+		panic(fmt.Errorf("unknown message type: %s", m.Type))
+	}
+	return reply
+}
+
 type Heartbeat struct {
 	RawId json.Number `json:"id"`
 }
