@@ -31,20 +31,20 @@ func New(endpoint string, username string, keyFile string) (*Client, error) {
 }
 
 type Message struct {
-	ID      json.Number `json:"id"`
+	RawId   json.Number `json:"id"`
 	Content string
 }
 
 func (m Message) Id() string {
-	return m.ID.String()
+	return m.RawId.String()
 }
 
 type Heartbeat struct {
-	ID json.Number `json:"id"`
+	RawId json.Number `json:"id"`
 }
 
 func (h Heartbeat) Id() string {
-	return h.ID.String()
+	return h.RawId.String()
 }
 
 type baseResponse struct {
