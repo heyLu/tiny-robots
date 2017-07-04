@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"./zulip"
@@ -17,7 +18,14 @@ func main() {
 	onEachEvent(client, func(ev zulip.Event) {
 		switch ev := ev.(type) {
 		case zulip.Message:
-			fmt.Println("message:", ev.Content)
+			switch {
+			case strings.HasPrefix(ev.Content, "!hi"):
+				r := ev.Reply(fmt.Sprintf("%s said hi!", ev.SenderEmail))
+				err := client.Send(r)
+				if err != nil {
+					log.Println("sending message", err)
+				}
+			}
 		case zulip.Heartbeat:
 			fmt.Println("heartbeat")
 		default:
