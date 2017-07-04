@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -24,6 +26,23 @@ func main() {
 				err := client.Send(r)
 				if err != nil {
 					log.Println("sending message", err)
+				}
+			case strings.HasPrefix(ev.Content, "!failed"):
+				var buf bytes.Buffer
+				cmd := exec.Command("systemctl", "--failed")
+				cmd.Stdout = &buf
+				cmd.Stderr = &buf
+				err := cmd.Run()
+				if err != nil {
+					log.Println("systemctl --failed:", err)
+					return
+				}
+
+				r := ev.Reply(fmt.Sprintf("```\n$ systemctl --failed\n%s```", buf.String()))
+				err = client.Send(r)
+				if err != nil {
+					log.Println("sending message", err)
+					return
 				}
 			}
 		case zulip.Heartbeat:
