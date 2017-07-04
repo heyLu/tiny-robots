@@ -14,6 +14,19 @@ func main() {
 		log.Println("creating client:", err)
 	}
 
+	onEachEvent(client, func(ev zulip.Event) {
+		switch ev := ev.(type) {
+		case zulip.Message:
+			fmt.Println("message:", ev.Content)
+		case zulip.Heartbeat:
+			fmt.Println("heartbeat")
+		default:
+			log.Println("unhandled message")
+		}
+	})
+}
+
+func onEachEvent(client *zulip.Client, handle func(zulip.Event)) {
 	r, err := client.Register("message")
 	if err != nil {
 		log.Println("registering queue:", err)
@@ -45,16 +58,7 @@ func main() {
 		for _, ev := range events {
 			lastEventId = ev.Id()
 
-			switch ev := ev.(type) {
-			case zulip.Message:
-				fmt.Println("message:", ev.Content)
-			case zulip.Heartbeat:
-				fmt.Println("heartbeat")
-			default:
-				log.Println("unhandled message")
-			}
+			handle(ev)
 		}
-
-		fmt.Println("last id:", lastEventId)
 	}
 }
