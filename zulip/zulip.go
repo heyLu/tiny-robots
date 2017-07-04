@@ -202,6 +202,45 @@ func (c Client) newRequest(method string, action string, params url.Values) (*ht
 	return req, nil
 }
 
+func (c Client) Send(msg Message) error {
+	vs := url.Values{}
+	vs.Set("type", msg.Type)
+	vs.Set("content", msg.Content)
+	vs.Set("subject", msg.Subject)
+	switch msg.Type {
+	case "private":
+		rs, _ := json.Marshal(msg.Recipients)
+		vs.Set("to", string(rs))
+	case "stream":
+		vs.Set("to", msg.Stream)
+	default:
+		return fmt.Errorf("unknown message type: %s", msg.Type)
+	}
+	req, err := c.newRequest("POST", "messages", vs)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	var r baseResponse
+	err = dec.Decode(&r)
+	if err != nil {
+		return err
+	}
+
+	if r.Result != "success" {
+		return fmt.Errorf("sending message: %s", r.Msg)
+	}
+
+	return nil
+}
+
 func (c Client) OnEachEvent(handle func(Event)) {
 	r, err := c.Register()
 	if err != nil {
