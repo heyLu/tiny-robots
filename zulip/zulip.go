@@ -123,9 +123,9 @@ type EventsResponse struct {
 	baseResponse
 
 	Events []struct {
-		Type      string          `json:"type"`
-		Message   json.RawMessage `json:"message"`
-		Heartbeat json.RawMessage `json:"heartbeat"`
+		Type    string          `json:"type"`
+		RawId   json.Number     `json:"id"`
+		Message json.RawMessage `json:"message"`
 	} `json:"events"`
 }
 
@@ -183,16 +183,13 @@ func (c Client) Events(queueId, lastEventId string) ([]Event, error) {
 			}
 			ev = v
 		case "heartbeat":
-			data = rawEv.Heartbeat
-			var v Heartbeat
-			err = json.Unmarshal(data, &v)
-			ev = v
+			ev = Heartbeat{RawId: rawEv.RawId}
 		default:
 			return nil, fmt.Errorf("unknown event type: %s: %s", rawEv.Type)
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("parsing event: %s: %s", string(data), err)
+			return nil, fmt.Errorf("parsing event: type %s: %q: %s", rawEv.Type, string(data), err)
 		}
 
 		parsedEvents[i] = ev.(Event)

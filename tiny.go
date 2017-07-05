@@ -59,7 +59,6 @@ func main() {
 				}
 			}
 		case zulip.Heartbeat:
-			fmt.Println("heartbeat")
 		default:
 			log.Println("unhandled message")
 		}
