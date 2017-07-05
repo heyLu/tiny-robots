@@ -61,6 +61,12 @@ func main() {
 					log.Println("sending message", err)
 					return
 				}
+			case strings.HasPrefix(ev.Content, "!rm") || strings.HasPrefix(ev.Content, "!sh"):
+				r := ev.Reply(fmt.Sprintf("```\n$ %s\n```\n\n... haha %s, very funny, but no thanks!", ev.Content[1:], ev.SenderEmail))
+				err := client.Send(r)
+				if err != nil {
+					log.Println("sending message", err)
+				}
 			case strings.HasPrefix(ev.Content, "!gif"):
 				search := "elephant" // error elephant
 				fs := strings.Fields(ev.Content)
