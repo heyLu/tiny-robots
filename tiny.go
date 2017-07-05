@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"log"
 	"os/exec"
@@ -11,8 +12,20 @@ import (
 	"./zulip"
 )
 
+var config struct {
+	endpoint string
+	botEmail string
+}
+
+func init() {
+	flag.StringVar(&config.endpoint, "endpoint", "https://zulip.papill0n.org", "The URL of the Zulip instance")
+	flag.StringVar(&config.botEmail, "bot", "announcy-bot@zulip.papill0n.org", "The email address of the bot")
+}
+
 func main() {
-	client, err := zulip.New("https://zulip.papill0n.org", "announcy-bot@zulip.papill0n.org", "api_key.txt")
+	flag.Parse()
+
+	client, err := zulip.New(config.endpoint, config.botEmail, "api_key.txt")
 	if err != nil {
 		log.Println("creating client:", err)
 	}
