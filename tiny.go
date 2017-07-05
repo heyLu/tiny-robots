@@ -141,7 +141,7 @@ func onEachEvent(client *zulip.Client, handle func(zulip.Event)) {
 		for _, ev := range events {
 			lastEventId = ev.Id()
 
-			handle(ev)
+			go handle(ev)
 		}
 	}
 }
