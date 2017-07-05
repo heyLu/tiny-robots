@@ -4,10 +4,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -15,6 +17,8 @@ import (
 type Client struct {
 	endpoint    string
 	credentials string
+
+	Debug bool
 }
 
 func New(endpoint string, username string, keyFile string) (*Client, error) {
@@ -144,8 +148,13 @@ func (c Client) Events(queueId, lastEventId string) ([]Event, error) {
 	}
 	defer resp.Body.Close()
 
+	var r io.Reader = resp.Body
+	if c.Debug {
+		r = io.TeeReader(resp.Body, os.Stdout)
+	}
+
 	var events EventsResponse
-	dec := json.NewDecoder(resp.Body)
+	dec := json.NewDecoder(r)
 	err = dec.Decode(&events)
 	if err != nil {
 		return nil, err
