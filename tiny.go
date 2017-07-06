@@ -45,7 +45,7 @@ func main() {
 			switch {
 			case strings.HasPrefix(ev.Content, "!hi"):
 				r := ev.Reply(fmt.Sprintf("%s said hi!", ev.SenderEmail))
-				doSend(client, r)
+				client.Send(r)
 			case strings.HasPrefix(ev.Content, "!failed"):
 				var buf bytes.Buffer
 				cmd := exec.Command("systemctl", "--failed")
@@ -58,10 +58,10 @@ func main() {
 				}
 
 				r := ev.Reply(fmt.Sprintf("```\n$ systemctl --failed\n%s```", buf.String()))
-				doSend(client, r)
+				client.Send(r)
 			case strings.HasPrefix(ev.Content, "!rm") || strings.HasPrefix(ev.Content, "!sh"):
 				r := ev.Reply(fmt.Sprintf("```\n$ %s\n```\n\n... haha %s, very funny, but no thanks!", ev.Content[1:], ev.SenderEmail))
-				doSend(client, r)
+				client.Send(r)
 			case strings.HasPrefix(ev.Content, "!gif"):
 				search := "elephant" // error elephant
 				fs := strings.Fields(ev.Content)
@@ -77,14 +77,14 @@ func main() {
 				u, _ := url.Parse(imageURL)
 				u.Scheme = "https"
 				r := ev.Reply(fmt.Sprintf("here's some %s: %s", search, u))
-				doSend(client, r)
+				client.Send(r)
 			case strings.HasPrefix(ev.Content, "!godoc"):
 				fs := strings.Fields(ev.Content)
 				if len(fs) < 2 {
 					return
 				}
 				r := ev.Reply(fmt.Sprintf("https://godoc.org/%s", fs[1]))
-				doSend(client, r)
+				client.Send(r)
 			}
 		case zulip.Heartbeat:
 		default:
@@ -124,7 +124,7 @@ func pipelineServer(client *SimpleClient, addr string) {
 			return
 		}
 
-		doSend(client, zulip.Message{
+		client.Send(zulip.Message{
 			Type:    "stream",
 			Stream:  "platform",
 			Subject: findKey(v, "project", "name").(string),
@@ -166,11 +166,4 @@ func getJSON(url string) (interface{}, error) {
 	}
 
 	return res, nil
-}
-
-func doSend(client *SimpleClient, msg zulip.Message) {
-	err := client.Send(msg)
-	if err != nil {
-		log.Println("sending message:", err)
-	}
 }
