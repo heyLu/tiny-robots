@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"strings"
 	"time"
@@ -78,8 +79,10 @@ func main() {
 					log.Println("random gif:", err)
 					return
 				}
-				url := gifInfo.(map[string]interface{})["data"].(map[string]interface{})["image_url"].(string)
-				r := ev.Reply(fmt.Sprintf("here's some %s: %s", search, url))
+				imageURL := gifInfo.(map[string]interface{})["data"].(map[string]interface{})["image_url"].(string)
+				u, _ := url.Parse(imageURL)
+				u.Scheme = "https"
+				r := ev.Reply(fmt.Sprintf("here's some %s: %s", search, u))
 				err = client.Send(r)
 				if err != nil {
 					log.Println("sending message", err)
