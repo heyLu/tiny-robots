@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"./zulip"
 )
@@ -33,14 +32,14 @@ func init() {
 func main() {
 	flag.Parse()
 
-	client, err := zulip.New(config.endpoint, config.botEmail, "api_key.txt")
+	client, err := New(config.endpoint, config.botEmail, "api_key.txt")
 	if err != nil {
 		log.Println("creating client:", err)
 	}
 
 	go pipelineServer(client, ":12001")
 
-	onEachEvent(client, func(ev zulip.Event) {
+	client.OnEachEvent(func(ev zulip.Event) {
 		switch ev := ev.(type) {
 		case zulip.Message:
 			switch {
@@ -101,7 +100,7 @@ var templateFuncs = template.FuncMap{
 }
 var pipelineTmpl = template.Must(template.New("").Funcs(templateFuncs).Parse(`{{ if eq .object_attributes.status "success" }}🎉{{ else }}⛈{{ end}} Build for {{ .project.name }} ("{{ index (lines .commit.message) 0 }}", {{ .object_attributes.ref }}) ran with status {{ .object_attributes.status }} (took {{ .object_attributes.duration }}s)`))
 
-func pipelineServer(client *zulip.Client, addr string) {
+func pipelineServer(client *SimpleClient, addr string) {
 	http.HandleFunc("/pipeline-status", func(w http.ResponseWriter, req *http.Request) {
 		r := io.TeeReader(req.Body, os.Stdout)
 		dec := json.NewDecoder(r)
@@ -169,46 +168,9 @@ func getJSON(url string) (interface{}, error) {
 	return res, nil
 }
 
-func doSend(client *zulip.Client, msg zulip.Message) {
+func doSend(client *SimpleClient, msg zulip.Message) {
 	err := client.Send(msg)
 	if err != nil {
 		log.Println("sending message:", err)
-	}
-}
-
-func onEachEvent(client *zulip.Client, handle func(zulip.Event)) {
-	r, err := client.Register("message")
-	if err != nil {
-		log.Fatal("registering queue:", err)
-	}
-	queueId := r.QueueId
-	lastEventId := r.LastEventId.String()
-
-	first := true
-	for {
-		if !first {
-			time.Sleep(500 * time.Millisecond)
-		}
-		first = false
-
-		events, err := client.Events(queueId, lastEventId)
-		if err != nil {
-			if zulip.IsBadQueue(err) {
-				r, err := client.Register("message")
-				if err != nil {
-					log.Println("registering queue:", err)
-				}
-				queueId = r.QueueId
-				lastEventId = r.LastEventId.String()
-			}
-			log.Println("getting events:", err)
-			continue
-		}
-
-		for _, ev := range events {
-			lastEventId = ev.Id()
-
-			handle(ev)
-		}
 	}
 }
