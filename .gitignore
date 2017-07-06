@@ -1,3 +1,7 @@
 /api_key.txt
-
 /projects
+/*.yaml
+
+/.go
+/vendor
+/tiny-robots

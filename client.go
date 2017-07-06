@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"./zulip"
+	"github.com/heyLu/tiny-robots/zulip"
 )
 
 type SimpleClient struct {

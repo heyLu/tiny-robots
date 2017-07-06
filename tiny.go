@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -15,25 +16,39 @@ import (
 	"path"
 	"strings"
 
-	"./zulip"
+	"github.com/go-yaml/yaml"
+
+	"github.com/heyLu/tiny-robots/zulip"
 )
 
-var config struct {
-	endpoint    string
-	botEmail    string
-	giphyAPIKey string
+type cfg struct {
+	Endpoint    string `yaml:"endpoint"`
+	BotEmail    string `yaml:"bot-email"`
+	GiphyAPIKey string `yaml:"giphy"`
 }
 
+var config cfg
+var configPath string
+
 func init() {
-	flag.StringVar(&config.endpoint, "endpoint", "https://zulip.papill0n.org", "The URL of the Zulip instance")
-	flag.StringVar(&config.botEmail, "bot", "announcy-bot@zulip.papill0n.org", "The email address of the bot")
-	flag.StringVar(&config.giphyAPIKey, "giphy", "", "The API key for Giphy")
+	flag.StringVar(&config.Endpoint, "endpoint", "https://zulip.papill0n.org", "The URL of the Zulip instance")
+	flag.StringVar(&config.BotEmail, "bot", "announcy-bot@zulip.papill0n.org", "The email address of the bot")
+	flag.StringVar(&config.GiphyAPIKey, "giphy", "", "The API key for Giphy")
+
+	flag.StringVar(&configPath, "config", "", "The path to the config file (flags will be ignored)")
 }
 
 func main() {
 	flag.Parse()
 
-	client, err := New(config.endpoint, config.botEmail, "api_key.txt")
+	if configPath != "" {
+		err := readConfig(configPath, &config)
+		if err != nil {
+			log.Fatal("reading config: ", err)
+		}
+	}
+
+	client, err := New(config.Endpoint, config.BotEmail, "api_key.txt")
 	if err != nil {
 		log.Println("creating client:", err)
 	}
@@ -66,7 +81,7 @@ func main() {
 				if len(fs) >= 2 {
 					search = fs[1]
 				}
-				gifInfo, err := getJSON("https://api.giphy.com/v1/gifs/random?api_key=" + config.giphyAPIKey + "&tag=" + search)
+				gifInfo, err := getJSON("https://api.giphy.com/v1/gifs/random?api_key=" + config.GiphyAPIKey + "&tag=" + search)
 				if err != nil {
 					log.Println("random gif:", err)
 					return
@@ -202,4 +217,18 @@ func getJSON(url string) (interface{}, error) {
 	}
 
 	return res, nil
+}
+
+func readConfig(p string, config *cfg) error {
+	data, err := ioutil.ReadFile(p)
+	if err != nil {
+		return err
+	}
+
+	err = yaml.Unmarshal(data, config)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
