@@ -92,6 +92,16 @@ func main() {
 				if err != nil {
 					log.Println("sending message", err)
 				}
+			case strings.HasPrefix(ev.Content, "!godoc"):
+				fs := strings.Fields(ev.Content)
+				if len(fs) < 2 {
+					return
+				}
+				r := ev.Reply(fmt.Sprintf("https://godoc.org/%s", fs[1]))
+				err := client.Send(r)
+				if err != nil {
+					log.Println("sending message", err)
+				}
 			}
 		case zulip.Heartbeat:
 		default:
