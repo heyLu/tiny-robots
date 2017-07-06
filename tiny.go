@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -34,6 +37,8 @@ func main() {
 	if err != nil {
 		log.Println("creating client:", err)
 	}
+
+	go pipelineServer(client, ":12001")
 
 	onEachEvent(client, func(ev zulip.Event) {
 		switch ev := ev.(type) {
@@ -93,6 +98,67 @@ func main() {
 			log.Println("unhandled message")
 		}
 	})
+}
+
+var templateFuncs = template.FuncMap{
+	"lines": func(s string) []string {
+		return strings.Split(s, "\n")
+	},
+}
+var pipelineTmpl = template.Must(template.New("").Funcs(templateFuncs).Parse(`{{ if eq .object_attributes.status "success" }}🎉{{ else }}⛈{{ end}} Build for {{ .project.name }} ("{{ index (lines .commit.message) 0 }}", {{ .object_attributes.ref }}) ran with status {{ .object_attributes.status }} (took {{ .object_attributes.duration }}s)`))
+
+func pipelineServer(client *zulip.Client, addr string) {
+	http.HandleFunc("/pipeline-status", func(w http.ResponseWriter, req *http.Request) {
+		r := io.TeeReader(req.Body, os.Stdout)
+		dec := json.NewDecoder(r)
+		var v interface{}
+		err := dec.Decode(&v)
+		fmt.Println()
+		if err != nil {
+			log.Println("parsing pipeline status:", err)
+			return
+		}
+
+		var buf bytes.Buffer
+		err = pipelineTmpl.Execute(&buf, v)
+		if err != nil {
+			log.Println("rendering template:", err)
+			return
+		}
+
+		status := findKey(v, "object_attributes", "status").(string)
+		if status == "pending" || status == "running" {
+			return
+		}
+
+		err = client.Send(zulip.Message{
+			Type:    "stream",
+			Stream:  "platform",
+			Subject: findKey(v, "project", "name").(string),
+			Content: buf.String(),
+		})
+		if err != nil {
+			log.Println("sending message:", err)
+		}
+	})
+	err := http.ListenAndServe(addr, nil)
+	if err != nil {
+		log.Println("serve:", err)
+	}
+}
+
+func findKey(val interface{}, keys ...interface{}) interface{} {
+	for _, key := range keys {
+		switch v := val.(type) {
+		case map[string]interface{}:
+			val = v[key.(string)]
+		case []interface{}:
+			val = v[key.(int)]
+		default:
+			log.Printf("error, unhandled nested value: %v (%T)\n", v, v)
+		}
+	}
+	return val
 }
 
 func getJSON(url string) (interface{}, error) {
