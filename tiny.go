@@ -177,6 +177,7 @@ func main() {
 
 				if resp.StatusCode >= 400 {
 					log.Printf("gitlab error: %#v\n", v)
+					client.Replyf(ev, "Could not start pipeline for %q: %s", project, findKey(v, "message"))
 					return
 				}
 
