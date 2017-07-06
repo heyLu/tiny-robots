@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 
 	"./zulip"
@@ -80,6 +81,46 @@ func main() {
 					return
 				}
 				client.Replyf(ev, "https://godoc.org/%s", fs[1])
+			case strings.HasPrefix(ev.Content, "!test"):
+				fs := strings.Fields(ev.Content)
+				if len(fs) < 3 {
+					client.Reply(ev, "usage: !test <project> <branch-or-ref>")
+					return
+				}
+				project := fs[1]
+				projectPath := path.Join("projects", project)
+				ref := fs[2]
+
+				var buf bytes.Buffer
+				cmd := exec.Command("git", "-C", projectPath, "fetch")
+				cmd.Stdout = io.MultiWriter(&buf, os.Stdout)
+				cmd.Stderr = io.MultiWriter(&buf, os.Stderr)
+				err := cmd.Run()
+				if err != nil {
+					log.Println("git fetch:", err)
+					client.Replyf(ev, "git fetch: %q", strings.TrimSpace(buf.String()))
+					return
+				}
+
+				cmd = exec.Command("git", "-C", projectPath, "checkout", ref)
+				err = cmd.Run()
+				if err != nil {
+					log.Println("git checkout:", ref, err)
+					client.Replyf(ev, "no such branch: %s", ref)
+					return
+				}
+
+				buf.Reset()
+				cmd = exec.Command("/bin/sh", "-c", fmt.Sprintf("cd %q && make test", projectPath))
+				cmd.Stdout = io.MultiWriter(&buf, os.Stdout)
+				cmd.Stderr = io.MultiWriter(&buf, os.Stderr)
+				err = cmd.Run()
+				emoji := "🎉"
+				if err != nil {
+					log.Println("make:", err)
+					emoji = "⛈"
+				}
+				client.Replyf(ev, "%s\n```\n%s\n```", emoji, buf.String())
 			}
 		case zulip.Heartbeat:
 		default:
