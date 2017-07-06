@@ -31,8 +31,8 @@ var config cfg
 var configPath string
 
 func init() {
-	flag.StringVar(&config.Endpoint, "endpoint", "https://zulip.papill0n.org", "The URL of the Zulip instance")
-	flag.StringVar(&config.BotEmail, "bot", "announcy-bot@zulip.papill0n.org", "The email address of the bot")
+	flag.StringVar(&config.Endpoint, "endpoint", "https://chat.zulip.org", "The URL of the Zulip instance")
+	flag.StringVar(&config.BotEmail, "bot", "tiny-bot@chat.zulip.org", "The email address of the bot")
 	flag.StringVar(&config.GiphyAPIKey, "giphy", "", "The API key for Giphy")
 
 	flag.StringVar(&configPath, "config", "", "The path to the config file (flags will be ignored)")
