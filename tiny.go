@@ -191,7 +191,7 @@ func getJSON(url string) (interface{}, error) {
 func onEachEvent(client *zulip.Client, handle func(zulip.Event)) {
 	r, err := client.Register("message")
 	if err != nil {
-		log.Println("registering queue:", err)
+		log.Fatal("registering queue:", err)
 	}
 	queueId := r.QueueId
 	lastEventId := r.LastEventId.String()
