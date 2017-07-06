@@ -1,0 +1,3 @@
+endpoint: https://chat.zulip.org
+bot-email: tiny-bot@chat.zulip.org
+giphy: "<your-giphy-api-key>"
