@@ -44,8 +44,7 @@ func main() {
 		case zulip.Message:
 			switch {
 			case strings.HasPrefix(ev.Content, "!hi"):
-				r := ev.Reply(fmt.Sprintf("%s said hi!", ev.SenderEmail))
-				client.Send(r)
+				client.Replyf(ev, "%s said hi!", ev.SenderEmail)
 			case strings.HasPrefix(ev.Content, "!failed"):
 				var buf bytes.Buffer
 				cmd := exec.Command("systemctl", "--failed")
@@ -57,11 +56,9 @@ func main() {
 					return
 				}
 
-				r := ev.Reply(fmt.Sprintf("```\n$ systemctl --failed\n%s```", buf.String()))
-				client.Send(r)
+				client.Replyf(ev, "```\n$ systemctl --failed\n%s```", buf.String())
 			case strings.HasPrefix(ev.Content, "!rm") || strings.HasPrefix(ev.Content, "!sh"):
-				r := ev.Reply(fmt.Sprintf("```\n$ %s\n```\n\n... haha %s, very funny, but no thanks!", ev.Content[1:], ev.SenderEmail))
-				client.Send(r)
+				client.Replyf(ev, "```\n$ %s\n```\n\n... haha %s, very funny, but no thanks!", ev.Content[1:], ev.SenderEmail)
 			case strings.HasPrefix(ev.Content, "!gif"):
 				search := "elephant" // error elephant
 				fs := strings.Fields(ev.Content)
@@ -76,15 +73,13 @@ func main() {
 				imageURL := gifInfo.(map[string]interface{})["data"].(map[string]interface{})["image_url"].(string)
 				u, _ := url.Parse(imageURL)
 				u.Scheme = "https"
-				r := ev.Reply(fmt.Sprintf("here's some %s: %s", search, u))
-				client.Send(r)
+				client.Replyf(ev, "here's some %s: %s", search, u)
 			case strings.HasPrefix(ev.Content, "!godoc"):
 				fs := strings.Fields(ev.Content)
 				if len(fs) < 2 {
 					return
 				}
-				r := ev.Reply(fmt.Sprintf("https://godoc.org/%s", fs[1]))
-				client.Send(r)
+				client.Replyf(ev, "https://godoc.org/%s", fs[1])
 			}
 		case zulip.Heartbeat:
 		default:

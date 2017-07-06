@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -29,6 +30,18 @@ func (c *SimpleClient) Send(msg zulip.Message) error {
 		log.Println("sending message:", err)
 	}
 	return err
+}
+
+// Reply replies to the message, logging the error if it occurs.
+func (c *SimpleClient) Reply(msg zulip.Message, content string) error {
+	return c.Send(msg.Reply(content))
+}
+
+// Reply replies to the message formatted according to `fmt.Sprintf`.
+//
+// Equivalent to calling `c.Reply(msg, fmt.Sprintf(fmt, args...))`.
+func (c *SimpleClient) Replyf(msg zulip.Message, format string, args ...interface{}) error {
+	return c.Send(msg.Reply(fmt.Sprintf(format, args...)))
 }
 
 func (c *SimpleClient) OnEachEvent(handle func(zulip.Event)) {
