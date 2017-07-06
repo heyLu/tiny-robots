@@ -25,7 +25,7 @@ func New(endpoint, botEmail, keyPath string) (*SimpleClient, error) {
 // The error is returned so that callers can change their control flow
 // if errors happen.
 func (c *SimpleClient) Send(msg zulip.Message) error {
-	err := c.Send(msg)
+	err := c.Client.Send(msg)
 	if err != nil {
 		log.Println("sending message:", err)
 	}
