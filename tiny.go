@@ -46,10 +46,7 @@ func main() {
 			switch {
 			case strings.HasPrefix(ev.Content, "!hi"):
 				r := ev.Reply(fmt.Sprintf("%s said hi!", ev.SenderEmail))
-				err := client.Send(r)
-				if err != nil {
-					log.Println("sending message", err)
-				}
+				doSend(client, r)
 			case strings.HasPrefix(ev.Content, "!failed"):
 				var buf bytes.Buffer
 				cmd := exec.Command("systemctl", "--failed")
@@ -62,17 +59,10 @@ func main() {
 				}
 
 				r := ev.Reply(fmt.Sprintf("```\n$ systemctl --failed\n%s```", buf.String()))
-				err = client.Send(r)
-				if err != nil {
-					log.Println("sending message", err)
-					return
-				}
+				doSend(client, r)
 			case strings.HasPrefix(ev.Content, "!rm") || strings.HasPrefix(ev.Content, "!sh"):
 				r := ev.Reply(fmt.Sprintf("```\n$ %s\n```\n\n... haha %s, very funny, but no thanks!", ev.Content[1:], ev.SenderEmail))
-				err := client.Send(r)
-				if err != nil {
-					log.Println("sending message", err)
-				}
+				doSend(client, r)
 			case strings.HasPrefix(ev.Content, "!gif"):
 				search := "elephant" // error elephant
 				fs := strings.Fields(ev.Content)
@@ -88,20 +78,14 @@ func main() {
 				u, _ := url.Parse(imageURL)
 				u.Scheme = "https"
 				r := ev.Reply(fmt.Sprintf("here's some %s: %s", search, u))
-				err = client.Send(r)
-				if err != nil {
-					log.Println("sending message", err)
-				}
+				doSend(client, r)
 			case strings.HasPrefix(ev.Content, "!godoc"):
 				fs := strings.Fields(ev.Content)
 				if len(fs) < 2 {
 					return
 				}
 				r := ev.Reply(fmt.Sprintf("https://godoc.org/%s", fs[1]))
-				err := client.Send(r)
-				if err != nil {
-					log.Println("sending message", err)
-				}
+				doSend(client, r)
 			}
 		case zulip.Heartbeat:
 		default:
@@ -141,15 +125,12 @@ func pipelineServer(client *zulip.Client, addr string) {
 			return
 		}
 
-		err = client.Send(zulip.Message{
+		doSend(client, zulip.Message{
 			Type:    "stream",
 			Stream:  "platform",
 			Subject: findKey(v, "project", "name").(string),
 			Content: buf.String(),
 		})
-		if err != nil {
-			log.Println("sending message:", err)
-		}
 	})
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {
@@ -186,6 +167,13 @@ func getJSON(url string) (interface{}, error) {
 	}
 
 	return res, nil
+}
+
+func doSend(client *zulip.Client, msg zulip.Message) {
+	err := client.Send(msg)
+	if err != nil {
+		log.Println("sending message:", err)
+	}
 }
 
 func onEachEvent(client *zulip.Client, handle func(zulip.Event)) {
