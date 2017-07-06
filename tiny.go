@@ -175,6 +175,11 @@ func main() {
 					return
 				}
 
+				if resp.StatusCode >= 400 {
+					log.Printf("gitlab error: %#v\n", v)
+					return
+				}
+
 				id := findKey(v, "id").(float64)
 				status := findKey(v, "status").(string)
 				client.Replyf(ev, "Pipeline %s for %s@%s (%s/%s/pipelines/%0.f)", status, project, ref, config.GitLabBaseURL, project, id)
