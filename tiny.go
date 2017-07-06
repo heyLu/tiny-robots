@@ -22,9 +22,11 @@ import (
 )
 
 type cfg struct {
-	Endpoint    string `yaml:"endpoint"`
-	BotEmail    string `yaml:"bot-email"`
-	GiphyAPIKey string `yaml:"giphy"`
+	Endpoint      string `yaml:"endpoint"`
+	BotEmail      string `yaml:"bot-email"`
+	GiphyAPIKey   string `yaml:"giphy"`
+	GitLabAPIKey  string `yaml:"gitlab"`
+	GitLabBaseURL string `yaml:"gitlab-url"`
 }
 
 var config cfg
@@ -136,6 +138,46 @@ func main() {
 					emoji = "⛈"
 				}
 				client.Replyf(ev, "%s\n```\n%s\n```", emoji, buf.String())
+			case strings.HasPrefix(ev.Content, "!ci"):
+				fs := strings.Fields(ev.Content)
+				if len(fs) < 2 {
+					client.Reply(ev, "usage: !ci <project> [<branch-or-ref>]")
+					return
+				}
+				project := fs[1]
+				ref := "master"
+				if len(fs) >= 3 {
+					ref = fs[2]
+				}
+
+				req, err := http.NewRequest("POST", config.GitLabBaseURL+"/api/v4/projects/"+url.PathEscape(project)+"/pipeline", nil)
+				if err != nil {
+					log.Println("creating request:", err)
+					return
+				}
+				q := req.URL.Query()
+				q.Set("ref", ref)
+				req.URL.RawQuery = q.Encode()
+				req.Header.Set("Private-Token", config.GitLabAPIKey)
+
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					log.Println("gitlab request:", err)
+					return
+				}
+				defer resp.Body.Close()
+
+				var v interface{}
+				dec := json.NewDecoder(resp.Body)
+				err = dec.Decode(&v)
+				if err != nil {
+					log.Println("gitlab parse:", err)
+					return
+				}
+
+				id := findKey(v, "id").(float64)
+				status := findKey(v, "status").(string)
+				client.Replyf(ev, "Pipeline %s for %s@%s (%s/%s/pipelines/%0.f)", status, project, ref, config.GitLabBaseURL, project, id)
 			}
 		case zulip.Heartbeat:
 		default:
