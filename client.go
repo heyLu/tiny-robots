@@ -8,11 +8,23 @@ import (
 	"github.com/heyLu/tiny-robots/zulip"
 )
 
+type Client interface {
+	Send(Message) error
+	Reply(Message, string) error
+	Replyf(Message, string, ...interface{}) error
+	OnEachMessage(func(Message))
+}
+
+type Message interface {
+	Author() string
+	Content() string
+}
+
 type SimpleClient struct {
 	*zulip.Client
 }
 
-func New(endpoint, botEmail, keyPath string) (*SimpleClient, error) {
+func New(endpoint, botEmail, keyPath string) (Client, error) {
 	c, err := zulip.New(endpoint, botEmail, keyPath)
 	if err != nil {
 		return nil, err
@@ -24,8 +36,8 @@ func New(endpoint, botEmail, keyPath string) (*SimpleClient, error) {
 //
 // The error is returned so that callers can change their control flow
 // if errors happen.
-func (c *SimpleClient) Send(msg zulip.Message) error {
-	err := c.Client.Send(msg)
+func (c *SimpleClient) Send(msg Message) error {
+	err := c.Client.Send(msg.(zulip.Message))
 	if err != nil {
 		log.Println("sending message:", err)
 	}
@@ -33,18 +45,18 @@ func (c *SimpleClient) Send(msg zulip.Message) error {
 }
 
 // Reply replies to the message, logging the error if it occurs.
-func (c *SimpleClient) Reply(msg zulip.Message, content string) error {
-	return c.Send(msg.Reply(content))
+func (c *SimpleClient) Reply(msg Message, content string) error {
+	return c.Send(msg.(zulip.Message).Reply(content))
 }
 
 // Reply replies to the message formatted according to `fmt.Sprintf`.
 //
 // Equivalent to calling `c.Reply(msg, fmt.Sprintf(fmt, args...))`.
-func (c *SimpleClient) Replyf(msg zulip.Message, format string, args ...interface{}) error {
-	return c.Send(msg.Reply(fmt.Sprintf(format, args...)))
+func (c *SimpleClient) Replyf(msg Message, format string, args ...interface{}) error {
+	return c.Send(msg.(zulip.Message).Reply(fmt.Sprintf(format, args...)))
 }
 
-func (c *SimpleClient) OnEachEvent(handle func(zulip.Event)) {
+func (c *SimpleClient) OnEachMessage(handle func(Message)) {
 	r, err := c.Register("message")
 	if err != nil {
 		log.Fatal("registering queue:", err)
@@ -76,7 +88,12 @@ func (c *SimpleClient) OnEachEvent(handle func(zulip.Event)) {
 		for _, ev := range events {
 			lastEventId = ev.Id()
 
-			handle(ev)
+			switch ev := ev.(type) {
+			case zulip.Message:
+				handle(ev)
+			default:
+				log.Println("unhandled:", ev)
+			}
 		}
 	}
 }

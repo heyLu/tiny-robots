@@ -39,7 +39,7 @@ type Message struct {
 	Type           string      `json:"type"`
 	RawRecipient   interface{} `json:"display_recipient"`
 	Subject        string      `json:"subject"`
-	Content        string      `json:"content"`
+	RawContent     string      `json:"content"`
 	SenderEmail    string      `json:"sender_email"`
 	SenderFullName string      `json:"sender_full_name"`
 
@@ -51,11 +51,19 @@ func (m Message) Id() string {
 	return m.RawId.String()
 }
 
+func (m Message) Author() string {
+	return m.SenderEmail
+}
+
+func (m Message) Content() string {
+	return m.RawContent
+}
+
 func (m Message) Reply(content string) Message {
 	reply := Message{
-		Type:    m.Type,
-		Subject: m.Subject,
-		Content: content,
+		Type:       m.Type,
+		Subject:    m.Subject,
+		RawContent: content,
 	}
 	switch m.Type {
 	case "private":
@@ -228,7 +236,7 @@ func (c Client) newRequest(method string, action string, params url.Values) (*ht
 func (c Client) Send(msg Message) error {
 	vs := url.Values{}
 	vs.Set("type", msg.Type)
-	vs.Set("content", msg.Content)
+	vs.Set("content", msg.RawContent)
 	vs.Set("subject", msg.Subject)
 	switch msg.Type {
 	case "private":

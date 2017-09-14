@@ -57,137 +57,131 @@ func main() {
 
 	go pipelineServer(client, ":12001")
 
-	client.OnEachEvent(func(ev zulip.Event) {
-		switch ev := ev.(type) {
-		case zulip.Message:
-			switch {
-			case strings.HasPrefix(ev.Content, "!hi"):
-				client.Replyf(ev, "%s said hi!", ev.SenderEmail)
-			case strings.HasPrefix(ev.Content, "!failed"):
-				var buf bytes.Buffer
-				cmd := exec.Command("systemctl", "--failed")
-				cmd.Stdout = &buf
-				cmd.Stderr = &buf
-				err := cmd.Run()
-				if err != nil {
-					log.Println("systemctl --failed:", err)
-					return
-				}
-
-				client.Replyf(ev, "```\n$ systemctl --failed\n%s```", buf.String())
-			case strings.HasPrefix(ev.Content, "!rm") || strings.HasPrefix(ev.Content, "!sh"):
-				client.Replyf(ev, "```\n$ %s\n```\n\n... haha %s, very funny, but no thanks!", ev.Content[1:], ev.SenderEmail)
-			case strings.HasPrefix(ev.Content, "!gif"):
-				search := "elephant" // error elephant
-				fs := strings.Fields(ev.Content)
-				if len(fs) >= 2 {
-					search = fs[1]
-				}
-				gifInfo, err := getJSON("https://api.giphy.com/v1/gifs/random?api_key=" + config.GiphyAPIKey + "&tag=" + search)
-				if err != nil {
-					log.Println("random gif:", err)
-					return
-				}
-				imageURL := gifInfo.(map[string]interface{})["data"].(map[string]interface{})["image_url"].(string)
-				u, _ := url.Parse(imageURL)
-				u.Scheme = "https"
-				client.Replyf(ev, "here's some %s: %s", search, u)
-			case strings.HasPrefix(ev.Content, "!godoc"):
-				fs := strings.Fields(ev.Content)
-				if len(fs) < 2 {
-					return
-				}
-				client.Replyf(ev, "https://godoc.org/%s", fs[1])
-			case strings.HasPrefix(ev.Content, "!test"):
-				fs := strings.Fields(ev.Content)
-				if len(fs) < 3 {
-					client.Reply(ev, "usage: !test <project> <branch-or-ref>")
-					return
-				}
-				project := fs[1]
-				projectPath := path.Join("projects", project)
-				ref := fs[2]
-
-				var buf bytes.Buffer
-				cmd := exec.Command("git", "-C", projectPath, "fetch")
-				cmd.Stdout = io.MultiWriter(&buf, os.Stdout)
-				cmd.Stderr = io.MultiWriter(&buf, os.Stderr)
-				err := cmd.Run()
-				if err != nil {
-					log.Println("git fetch:", err)
-					client.Replyf(ev, "git fetch: %q", strings.TrimSpace(buf.String()))
-					return
-				}
-
-				cmd = exec.Command("git", "-C", projectPath, "checkout", ref)
-				err = cmd.Run()
-				if err != nil {
-					log.Println("git checkout:", ref, err)
-					client.Replyf(ev, "no such branch: %s", ref)
-					return
-				}
-
-				buf.Reset()
-				cmd = exec.Command("/bin/sh", "-c", fmt.Sprintf("cd %q && make test", projectPath))
-				cmd.Stdout = io.MultiWriter(&buf, os.Stdout)
-				cmd.Stderr = io.MultiWriter(&buf, os.Stderr)
-				err = cmd.Run()
-				emoji := "🎉"
-				if err != nil {
-					log.Println("make:", err)
-					emoji = "⛈"
-				}
-				client.Replyf(ev, "%s\n```\n%s\n```", emoji, buf.String())
-			case strings.HasPrefix(ev.Content, "!ci"):
-				fs := strings.Fields(ev.Content)
-				if len(fs) < 2 {
-					client.Reply(ev, "usage: !ci <project> [<branch-or-ref>]")
-					return
-				}
-				project := fs[1]
-				ref := "master"
-				if len(fs) >= 3 {
-					ref = fs[2]
-				}
-
-				req, err := http.NewRequest("POST", config.GitLabBaseURL+"/api/v4/projects/"+url.PathEscape(project)+"/pipeline", nil)
-				if err != nil {
-					log.Println("creating request:", err)
-					return
-				}
-				q := req.URL.Query()
-				q.Set("ref", ref)
-				req.URL.RawQuery = q.Encode()
-				req.Header.Set("Private-Token", config.GitLabAPIKey)
-
-				resp, err := http.DefaultClient.Do(req)
-				if err != nil {
-					log.Println("gitlab request:", err)
-					return
-				}
-				defer resp.Body.Close()
-
-				var v interface{}
-				dec := json.NewDecoder(resp.Body)
-				err = dec.Decode(&v)
-				if err != nil {
-					log.Println("gitlab parse:", err)
-					return
-				}
-
-				if resp.StatusCode >= 400 {
-					log.Printf("gitlab error: %#v\n", v)
-					client.Replyf(ev, "Could not start pipeline for %q: %s", project, findKey(v, "message"))
-					return
-				}
-
-				id := findKey(v, "id").(float64)
-				status := findKey(v, "status").(string)
-				client.Replyf(ev, "Pipeline %s for %s@%s (%s/%s/pipelines/%0.f)", status, project, ref, config.GitLabBaseURL, project, id)
+	client.OnEachMessage(func(ev Message) {
+		switch {
+		case strings.HasPrefix(ev.Content(), "!hi"):
+			client.Replyf(ev, "%s said hi!", ev.Author())
+		case strings.HasPrefix(ev.Content(), "!failed"):
+			var buf bytes.Buffer
+			cmd := exec.Command("systemctl", "--failed")
+			cmd.Stdout = &buf
+			cmd.Stderr = &buf
+			err := cmd.Run()
+			if err != nil {
+				log.Println("systemctl --failed:", err)
+				return
 			}
-		case zulip.Heartbeat:
-		default:
-			log.Println("unhandled message")
+
+			client.Replyf(ev, "```\n$ systemctl --failed\n%s```", buf.String())
+		case strings.HasPrefix(ev.Content(), "!rm") || strings.HasPrefix(ev.Content(), "!sh"):
+			client.Replyf(ev, "```\n$ %s\n```\n\n... haha %s, very funny, but no thanks!", ev.Content()[1:], ev.Author())
+		case strings.HasPrefix(ev.Content(), "!gif"):
+			search := "elephant" // error elephant
+			fs := strings.Fields(ev.Content())
+			if len(fs) >= 2 {
+				search = fs[1]
+			}
+			gifInfo, err := getJSON("https://api.giphy.com/v1/gifs/random?api_key=" + config.GiphyAPIKey + "&tag=" + search)
+			if err != nil {
+				log.Println("random gif:", err)
+				return
+			}
+			imageURL := gifInfo.(map[string]interface{})["data"].(map[string]interface{})["image_url"].(string)
+			u, _ := url.Parse(imageURL)
+			u.Scheme = "https"
+			client.Replyf(ev, "here's some %s: %s", search, u)
+		case strings.HasPrefix(ev.Content(), "!godoc"):
+			fs := strings.Fields(ev.Content())
+			if len(fs) < 2 {
+				return
+			}
+			client.Replyf(ev, "https://godoc.org/%s", fs[1])
+		case strings.HasPrefix(ev.Content(), "!test"):
+			fs := strings.Fields(ev.Content())
+			if len(fs) < 3 {
+				client.Reply(ev, "usage: !test <project> <branch-or-ref>")
+				return
+			}
+			project := fs[1]
+			projectPath := path.Join("projects", project)
+			ref := fs[2]
+
+			var buf bytes.Buffer
+			cmd := exec.Command("git", "-C", projectPath, "fetch")
+			cmd.Stdout = io.MultiWriter(&buf, os.Stdout)
+			cmd.Stderr = io.MultiWriter(&buf, os.Stderr)
+			err := cmd.Run()
+			if err != nil {
+				log.Println("git fetch:", err)
+				client.Replyf(ev, "git fetch: %q", strings.TrimSpace(buf.String()))
+				return
+			}
+
+			cmd = exec.Command("git", "-C", projectPath, "checkout", ref)
+			err = cmd.Run()
+			if err != nil {
+				log.Println("git checkout:", ref, err)
+				client.Replyf(ev, "no such branch: %s", ref)
+				return
+			}
+
+			buf.Reset()
+			cmd = exec.Command("/bin/sh", "-c", fmt.Sprintf("cd %q && make test", projectPath))
+			cmd.Stdout = io.MultiWriter(&buf, os.Stdout)
+			cmd.Stderr = io.MultiWriter(&buf, os.Stderr)
+			err = cmd.Run()
+			emoji := "🎉"
+			if err != nil {
+				log.Println("make:", err)
+				emoji = "⛈"
+			}
+			client.Replyf(ev, "%s\n```\n%s\n```", emoji, buf.String())
+		case strings.HasPrefix(ev.Content(), "!ci"):
+			fs := strings.Fields(ev.Content())
+			if len(fs) < 2 {
+				client.Reply(ev, "usage: !ci <project> [<branch-or-ref>]")
+				return
+			}
+			project := fs[1]
+			ref := "master"
+			if len(fs) >= 3 {
+				ref = fs[2]
+			}
+
+			req, err := http.NewRequest("POST", config.GitLabBaseURL+"/api/v4/projects/"+url.PathEscape(project)+"/pipeline", nil)
+			if err != nil {
+				log.Println("creating request:", err)
+				return
+			}
+			q := req.URL.Query()
+			q.Set("ref", ref)
+			req.URL.RawQuery = q.Encode()
+			req.Header.Set("Private-Token", config.GitLabAPIKey)
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				log.Println("gitlab request:", err)
+				return
+			}
+			defer resp.Body.Close()
+
+			var v interface{}
+			dec := json.NewDecoder(resp.Body)
+			err = dec.Decode(&v)
+			if err != nil {
+				log.Println("gitlab parse:", err)
+				return
+			}
+
+			if resp.StatusCode >= 400 {
+				log.Printf("gitlab error: %#v\n", v)
+				client.Replyf(ev, "Could not start pipeline for %q: %s", project, findKey(v, "message"))
+				return
+			}
+
+			id := findKey(v, "id").(float64)
+			status := findKey(v, "status").(string)
+			client.Replyf(ev, "Pipeline %s for %s@%s (%s/%s/pipelines/%0.f)", status, project, ref, config.GitLabBaseURL, project, id)
 		}
 	})
 }
@@ -199,7 +193,7 @@ var templateFuncs = template.FuncMap{
 }
 var pipelineTmpl = template.Must(template.New("").Funcs(templateFuncs).Parse(`{{ if eq .object_attributes.status "success" }}🎉{{ else }}⛈{{ end}} Build for {{ .project.name }} ("{{ index (lines .commit.message) 0 }}", {{ .object_attributes.ref }}) ran with status {{ .object_attributes.status }} (took {{ .object_attributes.duration }}s)`))
 
-func pipelineServer(client *SimpleClient, addr string) {
+func pipelineServer(client Client, addr string) {
 	http.HandleFunc("/pipeline-status", func(w http.ResponseWriter, req *http.Request) {
 		r := io.TeeReader(req.Body, os.Stdout)
 		dec := json.NewDecoder(r)
@@ -224,10 +218,10 @@ func pipelineServer(client *SimpleClient, addr string) {
 		}
 
 		client.Send(zulip.Message{
-			Type:    "stream",
-			Stream:  "platform",
-			Subject: findKey(v, "project", "name").(string),
-			Content: buf.String(),
+			Type:       "stream",
+			Stream:     "platform",
+			Subject:    findKey(v, "project", "name").(string),
+			RawContent: buf.String(),
 		})
 	})
 	err := http.ListenAndServe(addr, nil)
