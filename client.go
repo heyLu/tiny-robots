@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
-	"time"
 
-	"github.com/heyLu/tiny-robots/zulip"
+	"github.com/heyLu/tiny-robots/rocket"
 )
 
 type Client interface {
@@ -21,11 +21,16 @@ type Message interface {
 }
 
 type SimpleClient struct {
-	*zulip.Client
+	*rocket.Client
 }
 
-func New(endpoint, botEmail, keyPath string) (Client, error) {
-	c, err := zulip.New(endpoint, botEmail, keyPath)
+func New(endpoint, userName, keyPath string, roomID string) (Client, error) {
+	data, err := ioutil.ReadFile(keyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := rocket.New(endpoint, userName, string(data), roomID)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +42,7 @@ func New(endpoint, botEmail, keyPath string) (Client, error) {
 // The error is returned so that callers can change their control flow
 // if errors happen.
 func (c *SimpleClient) Send(msg Message) error {
-	err := c.Client.Send(msg.(zulip.Message))
+	err := c.Client.Send(msg.(rocket.Message))
 	if err != nil {
 		log.Println("sending message:", err)
 	}
@@ -46,54 +51,18 @@ func (c *SimpleClient) Send(msg Message) error {
 
 // Reply replies to the message, logging the error if it occurs.
 func (c *SimpleClient) Reply(msg Message, content string) error {
-	return c.Send(msg.(zulip.Message).Reply(content))
+	return c.Client.Reply(msg.(rocket.Message), content)
 }
 
 // Reply replies to the message formatted according to `fmt.Sprintf`.
 //
 // Equivalent to calling `c.Reply(msg, fmt.Sprintf(fmt, args...))`.
 func (c *SimpleClient) Replyf(msg Message, format string, args ...interface{}) error {
-	return c.Send(msg.(zulip.Message).Reply(fmt.Sprintf(format, args...)))
+	return c.Reply(msg.(rocket.Message), fmt.Sprintf(format, args...))
 }
 
 func (c *SimpleClient) OnEachMessage(handle func(Message)) {
-	r, err := c.Register("message")
-	if err != nil {
-		log.Fatal("registering queue:", err)
-	}
-	queueId := r.QueueId
-	lastEventId := r.LastEventId.String()
-
-	first := true
-	for {
-		if !first {
-			time.Sleep(500 * time.Millisecond)
-		}
-		first = false
-
-		events, err := c.Events(queueId, lastEventId)
-		if err != nil {
-			if zulip.IsBadQueue(err) {
-				r, err := c.Register("message")
-				if err != nil {
-					log.Println("registering queue:", err)
-				}
-				queueId = r.QueueId
-				lastEventId = r.LastEventId.String()
-			}
-			log.Println("getting events:", err)
-			continue
-		}
-
-		for _, ev := range events {
-			lastEventId = ev.Id()
-
-			switch ev := ev.(type) {
-			case zulip.Message:
-				handle(ev)
-			default:
-				log.Println("unhandled:", ev)
-			}
-		}
-	}
+	c.Client.OnEachMessage(func(msg rocket.Message) {
+		handle(msg)
+	})
 }

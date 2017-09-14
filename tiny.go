@@ -18,11 +18,12 @@ import (
 
 	"github.com/go-yaml/yaml"
 
-	"github.com/heyLu/tiny-robots/zulip"
+	"github.com/heyLu/tiny-robots/rocket"
 )
 
 type cfg struct {
 	Endpoint      string `yaml:"endpoint"`
+	Channel       string `yaml:"channel"`
 	BotEmail      string `yaml:"bot-email"`
 	GiphyAPIKey   string `yaml:"giphy"`
 	GitLabAPIKey  string `yaml:"gitlab"`
@@ -33,9 +34,10 @@ var config cfg
 var configPath string
 
 func init() {
-	flag.StringVar(&config.Endpoint, "endpoint", "https://chat.zulip.org", "The URL of the Zulip instance")
-	flag.StringVar(&config.BotEmail, "bot", "tiny-bot@chat.zulip.org", "The email address of the bot")
+	flag.StringVar(&config.Endpoint, "endpoint", "https://chat.example.org", "The URL of the chat server instance")
+	flag.StringVar(&config.BotEmail, "bot", "tiny-bot@example.org", "The email address (or username) of the bot")
 	flag.StringVar(&config.GiphyAPIKey, "giphy", "", "The API key for Giphy")
+	flag.StringVar(&config.Channel, "channel", "", "The name (or id) of the channel")
 
 	flag.StringVar(&configPath, "config", "", "The path to the config file (flags will be ignored)")
 }
@@ -50,7 +52,7 @@ func main() {
 		}
 	}
 
-	client, err := New(config.Endpoint, config.BotEmail, "api_key.txt")
+	client, err := New(config.Endpoint, config.BotEmail, "api_key.txt", config.Channel)
 	if err != nil {
 		log.Println("creating client:", err)
 	}
@@ -217,10 +219,8 @@ func pipelineServer(client Client, addr string) {
 			return
 		}
 
-		client.Send(zulip.Message{
-			Type:       "stream",
-			Stream:     "platform",
-			Subject:    findKey(v, "project", "name").(string),
+		client.Send(rocket.Message{
+			RoomID:     config.Channel,
 			RawContent: buf.String(),
 		})
 	})
